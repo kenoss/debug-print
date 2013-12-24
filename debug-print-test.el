@@ -32,36 +32,3 @@
        1
        (* n ::?= (fact (- n 1))))))
 (fact 5)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;; (defun eval-last-sexp-with-debug-print ()
-;;   (interactive)
-;;   (keu:dynamic-flet
-;;       ((preceding-sexp (&rest rest)
-;;          `(eval-with-debug-print ,(apply 'preceding-sexp rest))))
-;;     (eval-last-sexp)))
-
-; oh...
-; it fails since preceding-sexp is advized.
-; use dynamic-wind and advice.
-
-
-
-;; Common Lisp sublis
-;; sublis can be treat slicing?
-;; my-lexical-let
-;; keu:define-parameters
-;; (setq my-var%hoge 1)

@@ -106,15 +106,6 @@ Any ideas?"
 
 
 
-; remove?
-;;
-;; (defalias 'dynamic-let 'let)
-;; (put 'dynamic-let 'lisp-indent-function 1)
-;; (defalias 'dynamic-labels 'labels)
-;; (put 'dynamic-labels 'lisp-indent-function 1)
-
-
-
 (require 'cl-lib)
 
 
@@ -129,15 +120,6 @@ Any ideas?"
 
 ;;; core
 
-;; (defmacro debug-print (expr &optional f-name)
-;;   (with-current-buffer debug-print-buffer
-;;     (progn
-;;       (goto-char (point-max))
-;;       (insert (format debug-print-format-for-::?= (or f-name "") "" expr))
-;;       (let1 value (eval expr)
-;;         (progn
-;;           (insert (format debug-print-format-for-::?- value))
-;;           value)))))
 (defmacro debug-print (expr &optional f-name)
   "[internal] Evaluate EXPR, display and return the result. The results are
 displayed in the buffer with buffer name `debug-print-buffer-name'. The
@@ -146,16 +128,11 @@ optional argument F-NAME indicate in what function EXPR is."
      (progn
        (goto-char (point-max))
        (insert (format debug-print-format-for-::?= ,(or f-name "") "" ',expr))
-;       (let1 value ,expr
        (let ((value ,expr))
-;       (lexical-let ((value ,expr))
          (progn
            (insert (format debug-print-format-for-::?- value))
            value)))))
 
-; TODO: detect `defmacro'
-; TODO: hack compile using `provide'
-; TODO: use `declare'
 (defun debug-print:code-walk (action f-name sexp)
   "[internal] If ACTION is \'replace, replace the symbol `debug-print-symbol'
  (default is ::?=) followed by EXPR in SEXP with (debug-print EXPR). If
@@ -172,7 +149,7 @@ in what function EXPR is, and inform `debug-print'."
     (`(,(pred (eq debug-print-symbol)) ,x . ,expr)
      (pcase action
        (`replace
-        `((debug-print ,x ,f-name)
+        `((debug-print ,(debug-print:code-walk action f-name x) ,f-name)
           ,@(debug-print:code-walk action f-name expr)))
        (`remove
         `(,x ,@(debug-print:code-walk action f-name expr)))))
@@ -181,16 +158,11 @@ in what function EXPR is, and inform `debug-print'."
     (x
      x)))
 
-;; (defmacro eval-with-debug-print (expr)
-;;   "Evaluate EXPR with debug print. See aslo `debug-print:code-walk'"
-;;   (debug-print:code-walk 'replace nil expr))
-;; (defmacro eval-without-debug-print (expr)
-;;   (debug-print:code-walk 'remove nil expr))
 (defmacro eval-with-debug-print (expr)
   "Evaluate EXPR with debug print. See aslo `debug-print:code-walk'"
   (debug-print:code-walk 'replace nil (macroexpand-all expr)))
 (defmacro eval-without-debug-print (expr)
-  (debug-print:code-walk 'remove nil expr))
+  (debug-print:code-walk 'remove nil (macroexpand-all expr)))
 
 
 
@@ -211,27 +183,11 @@ in what function EXPR is, and inform `debug-print'."
 have to be set before calling of this funciton."
   (interactive)
   (progn
-    ;; (when (not debug-print-format-for-::?=)
-    ;;   (setq debug-print-format-for-::?=
-    ;;         (concat "::?=\"%s\":%s:%-" (int-to-string debug-print-width) "s\n")))
-    ;; (when (not debug-print-format-for-::?-)
-    ;;   (setq debug-print-format-for-::?-
-    ;;         (concat "::?-    %-" (int-to-string debug-print-width) "s\n")))
     (setq debug-print-format-for-::?=
           (concat "::?=\"%s\":%s:%-" (int-to-string debug-print-width) "s\n"))
     (setq debug-print-format-for-::?-
           (concat "::?-    %-" (int-to-string debug-print-width) "s\n"))
     (setq debug-print-buffer (get-buffer-create debug-print-buffer-name))))
-
-;; (defun debug-print-hijack-emacs (&optional on-or-off)
-;;   "[obsolute] Hijack functions in emacs. For the optional argument ON-OR-OFF
-;; it is allowed 'on (default) and 'off"
-;;   (let* ((on-or-off (or on-or-off 'on))
-;;          (func (pcase on-or-off
-;;                  (`on 'ad-enable-advice)
-;;                  (`off 'ad-disable-advice)
-;;                  (_ (error "the optional argument must be the symol 'on or 'off")))))
-;;     (funcall func 'preceding-sexp 'after 'debug-print-hijack-emacs-ad)))
 
 
 
