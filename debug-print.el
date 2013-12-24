@@ -1,6 +1,6 @@
 ; -*- lexical-binding: t -*-
 
-;;; debug-print.el ---
+;;; debug-print.el --- Gauche's reader macro for printf debugging
 
 ;; Copyright (C) 2013  Ken Okada
 
