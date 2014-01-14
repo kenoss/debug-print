@@ -1,11 +1,11 @@
-; -*- lexical-binding: t -*-
-
-;;; debug-print.el --- Gauche's reader macro for printf debugging
+;;; debug-print.el --- a nice printf debugging environment by the way Gauche do -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2013  Ken Okada
 
 ;; Author: Ken Okada <keno@senecio>
 ;; Keywords: lisp
+;; URL: https://github.com/kenoss/debug-print
+;; Package-Requires: ((emacs "24"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
