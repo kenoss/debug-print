@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2013  Ken Okada
 
-;; Author: Ken Okada <keno@senecio>
-;; Keywords: lisp
+;; Author: Ken Okada <keno.ss57@gmail.com>
+;; Keywords: extensions, lisp, tools, maint
 ;; URL: https://github.com/kenoss/debug-print
 ;; Package-Requires: ((emacs "24"))
 
@@ -41,13 +41,14 @@
 ;;         (bar (something-depends-oidn foo))
 ;;     ...)
 ;; After rewrite, move point to the last of expression as usual, and do
-;; `debug-print-eval-last-sexp'. It reads sexp and recursively rewrite it as follows:
+;; `debug-print-eval-last-sexp'. It is the same as `eval-last-sexp' except rewrite
+;; the read expression recursively as follows:
 ;;   ... ::?= expr ...
 ;;     => ... (debug-print expr) ...
-;; Here `debug-print' is a macro, which does the above frustrating idiom.
-;; (needs initialization.) For who kwons Gauche note that it is not implemented by
-;; reader macro. So one have to use some settings to inform emacs that the expression
-;; needs preprocessed.
+;; Here `debug-print' is a macro, which does that the above frustrating idiom does.
+;; (Note that this needs initialization.) For who kwons Gauche note that it is
+;; not implemented by reader macro. So one have to use some settings to inform
+;; emacs that the expression needs preprocessed.
 ;;
 ;; Initialization and configuration: To use the above feature, write as follows
 ;; in your .emacs.d/init.el (after setting of load-path):
@@ -60,8 +61,7 @@
 ;;   `debug-print-width'
 ;; (See definitions below.) You have to set these before calling of `debug-print-init'.
 ;;
-;; Example:
-;; Code:
+;; Example of code:
 ;;   (debug-print-init)
 ;;   (eval-with-debug-print
 ;;    (defun fact (n)
@@ -123,7 +123,7 @@ Any ideas?"
 (defmacro debug-print (expr &optional f-name)
   "[internal] Evaluate EXPR, display and return the result. The results are
 displayed in the buffer with buffer name `debug-print-buffer-name'. The
-optional argument F-NAME indicate in what function EXPR is."
+optional argument F-NAME indicates in what function EXPR is."
   `(with-current-buffer debug-print-buffer
      (progn
        (goto-char (point-max))
@@ -134,9 +134,9 @@ optional argument F-NAME indicate in what function EXPR is."
            value)))))
 
 (defun debug-print:code-walk (action f-name sexp)
-  "[internal] If ACTION is \'replace, replace the symbol `debug-print-symbol'
+  "[internal] If ACTION is \'replace, it replaces the symbol `debug-print-symbol'
  (default is ::?=) followed by EXPR in SEXP with (debug-print EXPR). If
-ACTION is \'remove, it only removes ::?= in SEXP. If possible it detect
+ACTION is \'remove, it only removes ::?= in SEXP. If possible it detects
 in what function EXPR is, and inform `debug-print'."
   (pcase sexp
     (`()
@@ -166,7 +166,7 @@ in what function EXPR is, and inform `debug-print'."
 
 
 
-;;; interface
+;;; user interface
 
 (defun debug-print-eval-last-sexp ()
   "Evaluate last sexp with debug print. See aslo `debug-print:code-walk'"
