@@ -86,23 +86,28 @@
 
 
 ;; move to keu
-(defmacro keu:with-advice (on-or-off func class advice &rest body)
-  "[internal] Evaluate BODY with ADVICE enabled/disabled.
-Note that there is a bug that it cannot restore the state of ADVICE.
-Any ideas?"
-  `(progn
-     ,(pcase on-or-off
-        (`'on `(ad-enable-advice ,func ,class ,advice))
-        (`'off `(ad-disable-advice ,func ,class ,advice))
-        (_ (error "the first argument must be the symol 'on or 'off")))
-     (ad-activate ,func)
-     ,@body
-     ,(pcase on-or-off
-        (`'on `(ad-disable-advice ,func ,class ,advice))
-        (`'off `(ad-enable-advice ,func ,class ,advice))
-        (_ (error "the first argument must be the symol 'on or 'off")))
-     (ad-activate ,func)))
-(put 'keu:with-advice 'lisp-indent-function 4)
+(defsubst keu:advice-enabled-p (func class name)
+  "[internal] Return t (resp. nil) if advice NAME of FUNC is enabled (resp. disabled)."
+  (not (not (ad-advice-enabled (ad-find-advice func class name)))))
+
+(defmacro keu:with-advice (enable-or-disable func class name &rest body)
+  "[internal] Evaluate BODY with NAME enabled/disabled."
+  (declare (indent 4))
+  (let ((enabled
+         (pcase enable-or-disable
+           (`'enable t)
+           (`'disable nil)
+           (_ (error "the first argument must be the symol 'enable or 'disable")))))
+    `(if (eq ,enabled (keu:advice-enabled-p ,func ,class ,name))
+         (progn ,@body)
+         (prog2                         ; return value is that of BODY
+             (progn
+               (,(if enabled 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
+               (ad-activate ,func))
+             (progn ,@body)
+           (progn
+             (,(if (not enabled) 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
+             (ad-activate ,func))))))
 
 
 
@@ -169,13 +174,12 @@ in what function EXPR is, and inform `debug-print'."
 ;;; user interface
 
 (defun debug-print-eval-last-sexp ()
-  "Evaluate last sexp with debug print. See aslo `debug-print:code-walk'"
+  "Evaluate last sexp with debug print. See aslo `debug-print:code-walk'."
   (interactive)
-  (keu:with-advice 'on 'preceding-sexp 'after 'debug-print-hijack-emacs-ad
+  (keu:with-advice 'enable 'preceding-sexp 'after 'debug-print-hijack-emacs-ad
     (call-interactively 'eval-last-sexp)))
-
-(defadvice preceding-sexp (after debug-print-hijack-emacs-ad)
-  "Enclose sexp with `eval-with-debug-print'"
+(defadvice preceding-sexp (after debug-print-hijack-emacs-ad disable)
+  "Enclose sexp with `eval-with-debug-print'."
   (setq ad-return-value `(eval-with-debug-print ,ad-return-value)))
 
 (defun debug-print-init ()
