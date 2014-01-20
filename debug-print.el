@@ -139,35 +139,41 @@ optional argument F-NAME indicates in what function EXPR is."
            value)))))
 
 (defun debug-print:code-walk (action f-name sexp)
-  "[internal] If ACTION is \'replace, it replaces the symbol `debug-print-symbol'
+  "[internal] If ACTION is 'replace, it replaces the symbol `debug-print-symbol'
  (default is ::?=) followed by EXPR in SEXP with (debug-print EXPR). If
-ACTION is \'remove, it only removes ::?= in SEXP. If possible it detects
-in what function EXPR is, and inform `debug-print'."
-  (pcase sexp
-    (`()
-     '())
-    ;; bugs here
-    (`(defun ,name ,args . ,rest)
-     `(defun ,name ,args ,@(debug-print:code-walk action (symbol-name name) rest)))
-    (`(defalias ',name . ,rest)
-     `(defalias ',name ,@(debug-print:code-walk action (symbol-name name) rest)))
-    (`(,(pred (eq debug-print-symbol)) ,x . ,expr)
-     (pcase action
-       (`replace
-        `((debug-print ,(debug-print:code-walk action f-name x) ,f-name)
-          ,@(debug-print:code-walk action f-name expr)))
-       (`remove
-        `(,x ,@(debug-print:code-walk action f-name expr)))))
-    (`(,x . ,expr)
-     `(,(debug-print:code-walk action f-name x) ,@(debug-print:code-walk action f-name expr)))
-    (x
-     x)))
+ACTION is 'remove, it only removes ::?= in SEXP. If possible it detects
+in what function EXPR is, and inform `debug-print' of that."
+  (let ((sexp (if (eq 'defadvice (car-safe sexp))
+                  sexp
+                  (macroexpand sexp))))
+    (pcase sexp
+      (`()
+       '())
+      (`(quote ,x)
+       `(quote ,(debug-print:code-walk action f-name x)))
+      (`(\` ,x)
+       `(\` ,(debug-print:code-walk action f-name x)))
+      (`(,(pred (eq debug-print-symbol)) ,x . ,expr)
+       (pcase action
+         (`replace
+          `((debug-print ,(debug-print:code-walk action f-name x) ,f-name)
+            ,@(debug-print:code-walk action f-name expr)))
+         (`remove
+          `(,x ,@(debug-print:code-walk action f-name expr)))))
+      (`(defun ,name ,args . ,rest)
+       `(defun ,name ,args ,@(debug-print:code-walk action (symbol-name name) rest)))
+      (`(defmacro ,name ,args . ,rest)
+       `(defmacro ,name ,args ,@(debug-print:code-walk action (symbol-name name) rest)))
+      (`(,x . ,rest)
+       `(,(debug-print:code-walk action f-name x) ,@(debug-print:code-walk action f-name rest)))
+      (x
+       x))))
 
 (defmacro eval-with-debug-print (expr)
-  "Evaluate EXPR with debug print. See aslo `debug-print:code-walk'"
-  (debug-print:code-walk 'replace nil (macroexpand-all expr)))
+  "Evaluate EXPR with debug print. See also `debug-print:code-walk'."
+  (debug-print:code-walk 'replace nil expr))
 (defmacro eval-without-debug-print (expr)
-  (debug-print:code-walk 'remove nil (macroexpand-all expr)))
+  (debug-print:code-walk 'remove nil expr))
 
 
 
