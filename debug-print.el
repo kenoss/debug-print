@@ -143,7 +143,7 @@ optional argument F-NAME indicates in what function EXPR is."
  (default is ::?=) followed by EXPR in SEXP with (debug-print EXPR). If
 ACTION is 'remove, it only removes ::?= in SEXP. If possible it detects
 in what function EXPR is, and inform `debug-print' of that."
-  (let ((sexp (if (eq 'defadvice (car-safe sexp))
+  (let ((sexp (if (memq (car-safe sexp) '(defadvice lambda))
                   sexp
                   (macroexpand sexp))))
     (pcase sexp
