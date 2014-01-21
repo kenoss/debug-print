@@ -3,25 +3,25 @@
 ;; Note that the below are result with `eval-last-sexp'.
 ;; Evaluation with `debug-print-eval-last-sexp' will cause duplicate replacement.
 
-(debug-print:code-walk 'replace nil '())
+(debug-print:code-walk '() nil)
 ; => nil
-(debug-print:code-walk 'replace nil '(a b c d))
+(debug-print:code-walk '(a b c d) nil)
 ; => (a b c d)
-(debug-print:code-walk 'replace nil '(func ::?= a))
+(debug-print:code-walk '(func ::?= a) nil)
 ; => (func
 ;     (debug-print a nil))
-(debug-print:code-walk 'replace nil '(func ::?= a b))
+(debug-print:code-walk '(func ::?= a b) nil)
 ; => (func
 ;     (debug-print a nil)
 ;     b)
-(debug-print:code-walk 'remove nil '(func ::?= a b))
+(keu:replace-in-tree '((::?= @ ())) '(func ::?= a b))
 ; => (func a b)
-(debug-print:code-walk 'replace nil ''(+ 1 ::?= (+ 2 3)))
+(debug-print:code-walk ''(+ 1 ::?= (+ 2 3)) nil)
 ; => '(+ 1
 ;        (debug-print
 ;         (+ 2 3)
 ;         nil))
-(debug-print:code-walk 'replace nil '`(+ 1 ::?= (+ 2 3)))
+(debug-print:code-walk '`(+ 1 ::?= (+ 2 3)) nil)
 ; => '(+ 1
 ;        (debug-print
 ;         (+ 2 3)
@@ -29,17 +29,17 @@
 ;; The following should return '(+ 1 5) and display debugging message,
 ;; but it does not work! I don't know any ideas for it. Users have to
 ;; use `debug-print' directly.
-(debug-print:code-walk 'replace nil `'(+ 1 ,::?= (+ 2 3)))
+(debug-print:code-walk `'(+ 1 ,::?= (+ 2 3)) nil)
 ; => '(+ 1
 ;        (debug-print
 ;         (+ 2 3)
 ;         nil))
 
-(debug-print:code-walk 'replace nil
-                        '(defun fact (n)
-                           (if (zerop n)
-                               1
-                               (* n ::?= (fact (- n 1))))))
+(debug-print:code-walk '(defun fact (n)
+                          (if (zerop n)
+                              1
+                              (* n ::?= (fact (- n 1)))))
+                       nil)
 ; => (defun fact
 ;      (n)
 ;      (if
@@ -51,8 +51,7 @@
 ;               (- n 1))
 ;              "fact"))))
 
-(debug-print:code-walk 'replace nil
-                       '(defsubst hoge (n) (foo ::?= n)))
+(debug-print:code-walk '(defsubst hoge (n) (foo ::?= n))  nil)
 ; => (prog1
 ;        (defun hoge
 ;          (n)
@@ -61,11 +60,11 @@
 ;      (progn
 ;        (put 'hoge 'byte-optimizer 'byte-compile-inline-expand)))
 
-(debug-print:code-walk 'replace nil
-                       '(defmacro fact* (n)
+(debug-print:code-walk '(defmacro fact* (n)
                           (if (zerop n)
                               1
-                              `(* ,n ::?= (fact* ,(- n 1))))))
+                              `(* ,n ::?= (fact* ,(- n 1)))))
+                       nil)
 ; => (defmacro fact*
 ;      (n)
 ;      (if

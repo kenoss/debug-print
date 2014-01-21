@@ -86,32 +86,106 @@
 
 
 ;; move to keu
-(defsubst keu:advice-enabled-p (func class name)
-  "[internal] Return t (resp. nil) if advice NAME of FUNC is enabled (resp. disabled)."
-  (not (not (ad-advice-enabled (ad-find-advice func class name)))))
+(when (not (featurep 'k-emacs-utils))
+  (defsubst keu:advice-enabled-p (func class name)
+    "[internal] Return t (resp. nil) if advice NAME of FUNC is enabled (resp. disabled)."
+    (not (not (ad-advice-enabled (ad-find-advice func class name)))))
 
-(defmacro keu:with-advice (enable-or-disable func class name &rest body)
-  "[internal] Evaluate BODY with NAME enabled/disabled."
-  (declare (indent 4))
-  (let ((enabled
-         (pcase enable-or-disable
-           (`'enable t)
-           (`'disable nil)
-           (_ (error "the first argument must be the symol 'enable or 'disable")))))
-    `(if (eq ,enabled (keu:advice-enabled-p ,func ,class ,name))
-         (progn ,@body)
-         (prog2                         ; return value is that of BODY
+  (defmacro keu:with-advice (enable-or-disable func class name &rest body)
+    "[internal] Evaluate BODY with NAME enabled/disabled."
+    (declare (indent 4))
+    (let ((enabled
+           (pcase enable-or-disable
+             (`'enable t)
+             (`'disable nil)
+             (_ (error "the first argument must be the symol 'enable or 'disable")))))
+      `(if (eq ,enabled (keu:advice-enabled-p ,func ,class ,name))
+           (progn ,@body)
+           (prog2                       ; return value is that of BODY
+               (progn
+                 (,(if enabled 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
+                 (ad-activate ,func))
+               (progn ,@body)
              (progn
-               (,(if enabled 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
-               (ad-activate ,func))
-             (progn ,@body)
-           (progn
-             (,(if (not enabled) 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
-             (ad-activate ,func))))))
+               (,(if (not enabled) 'ad-enable-advice 'ad-disable-advice) ,func ,class ,name)
+               (ad-activate ,func))))))
+
+  (if (featurep 'srfi)
+      (defalias 'keu:reverse 'srfi:reverse)
+      (defun keu:reverse (xs &optional ys)
+        "Imported from Gauche."
+        (dolist (x xs ys) (push x ys))))
+
+  (defun keu:replace-in-tree (bindings sexp)
+    "Like `sublis', return a copy of SEXP with all matching elements replaced.
+BINDINGS should be a list and its elements should be the followings:
+
+  (VAR VAL)   : VAR in SEXP are replaced with VAL.
+  (VAR @ VAL) : Like the above except that VAL are spliced.
+
+Note that VAL is not evaluated.
+
+Examples:
+  (keu:replace-in-tree '((a 0)
+                      (c @ ())
+                      (e @ (+ 1 2))
+                      (g @))
+                    '(a b c d e f g))
+  ; => (0 b d + 1 2 f @)
+
+  (keu:replace-in-tree '((a 0)
+                      (c @ ())
+                      (e @ (+ 1 2)))
+                    '(a (a b c d e) c ((a) b (c) d (e)) e))
+  ; => (0
+  ;     (0 b d + 1 2)
+  ;     ((0)
+  ;      b nil d
+  ;      (+ 1 2))
+  ;     + 1 2)"
+    (let ((bindings (mapcar (lambda (bind)
+                              (if (and (eq '\@ (cadr bind)) (not (null (cddr bind))))
+                                  (list (car bind) t (caddr bind))
+                                  (list (car bind) nil (cadr bind))))
+                            bindings)))
+      (keu:replace-in-tree:iter bindings sexp nil nil nil)))
+  (defsubst keu:replace-in-tree:atom (bindings a non-splicing-case &optional splicing-case)
+    (catch 'return
+      (dolist (bind bindings (funcall non-splicing-case a))
+        (when (eq a (car bind))
+          (throw 'return
+                 ;; (if (eq '\@ (cadr bind))
+                 ;;     (funcall (or splicing-case non-splicing-case) (caddr bind))
+                 ;;     (funcall non-splicing-case (cadr bind))))))))
+                 (if (cadr bind)
+                     (funcall (or splicing-case non-splicing-case) (caddr bind))
+                     (funcall non-splicing-case (caddr bind))))))))
+  ;; `cut' was replaced manually
+  (defun keu:replace-in-tree:iter (bindings sexp acc l-stack r-stack)
+    (cond ((atom sexp)
+           (if (null l-stack)             ; <=> (null r-stack)
+               (keu:replace-in-tree:atom bindings sexp (lambda (x) (keu:reverse acc x)))
+               (keu:replace-in-tree:iter bindings
+                                      (car r-stack)
+                                      (cons (keu:replace-in-tree:atom bindings sexp (lambda (x) (keu:reverse acc x)))
+                                            (car l-stack))
+                                      (cdr l-stack)
+                                      (cdr r-stack))))
+          ((consp (car sexp))
+           (keu:replace-in-tree:iter bindings (car sexp) nil (cons acc l-stack) (cons (cdr sexp) r-stack)))
+          (t
+           (keu:replace-in-tree:iter bindings (cdr sexp)
+                                  (keu:replace-in-tree:atom bindings (car sexp)
+                                                         (lambda (x) (cons x acc))
+                                                         (lambda (x) (keu:reverse x acc)))
+                                  l-stack r-stack))))
+  )
 
 
 
+(eval-when-compile (require 'advice))
 (require 'cl-lib)
+(require 'cl) ; only for caddr
 
 
 
@@ -138,11 +212,10 @@ optional argument F-NAME indicates in what function EXPR is."
            (insert (format debug-print-format-for-::?- value))
            value)))))
 
-(defun debug-print:code-walk (action f-name sexp)
-  "[internal] If ACTION is 'replace, it replaces the symbol `debug-print-symbol'
- (default is ::?=) followed by EXPR in SEXP with (debug-print EXPR). If
-ACTION is 'remove, it only removes ::?= in SEXP. If possible it detects
-in what function EXPR is, and inform `debug-print' of that."
+(defun debug-print:code-walk (sexp f-name)
+  "[internal] Replaces the symbol `debug-print-symbol' (default is ::?=) followed
+by EXPR in SEXP with (debug-print EXPR). If possible it detects in what function
+EXPR is, and inform `debug-print' of that."
   (let ((sexp (if (memq (car-safe sexp) '(defadvice lambda))
                   sexp
                   (macroexpand sexp))))
@@ -150,30 +223,26 @@ in what function EXPR is, and inform `debug-print' of that."
       (`()
        '())
       (`(quote ,x)
-       `(quote ,(debug-print:code-walk action f-name x)))
+       `(quote ,(debug-print:code-walk x f-name)))
       (`(\` ,x)
-       `(\` ,(debug-print:code-walk action f-name x)))
-      (`(,(pred (eq debug-print-symbol)) ,x . ,expr)
-       (pcase action
-         (`replace
-          `((debug-print ,(debug-print:code-walk action f-name x) ,f-name)
-            ,@(debug-print:code-walk action f-name expr)))
-         (`remove
-          `(,x ,@(debug-print:code-walk action f-name expr)))))
+       `(\` ,(debug-print:code-walk x f-name)))
+      (`(,(pred (eq debug-print-symbol)) ,x . ,rest)
+       `((debug-print ,(debug-print:code-walk x f-name) ,f-name)
+         ,@(debug-print:code-walk rest f-name)))
       (`(defun ,name ,args . ,rest)
-       `(defun ,name ,args ,@(debug-print:code-walk action (symbol-name name) rest)))
+       `(defun ,name ,args ,@(debug-print:code-walk rest (symbol-name name))))
       (`(defmacro ,name ,args . ,rest)
-       `(defmacro ,name ,args ,@(debug-print:code-walk action (symbol-name name) rest)))
+       `(defmacro ,name ,args ,@(debug-print:code-walk rest (symbol-name name))))
       (`(,x . ,rest)
-       `(,(debug-print:code-walk action f-name x) ,@(debug-print:code-walk action f-name rest)))
+       `(,(debug-print:code-walk x f-name) ,@(debug-print:code-walk rest f-name)))
       (x
        x))))
 
 (defmacro eval-with-debug-print (expr)
   "Evaluate EXPR with debug print. See also `debug-print:code-walk'."
-  (debug-print:code-walk 'replace nil expr))
+  (debug-print:code-walk expr nil))
 (defmacro eval-without-debug-print (expr)
-  (debug-print:code-walk 'remove nil expr))
+  (keu:replace-in-tree `((,debug-print-symbol @ ())) expr))
 
 
 
