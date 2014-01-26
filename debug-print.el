@@ -1,4 +1,4 @@
-;;; debug-print.el --- a nice printf debugging environment by the way Gauche do -*- lexical-binding: t -*-
+;;; debug-print.el --- A nice printf debugging environment by the way Gauche do -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2013  Ken Okada
 
@@ -127,16 +127,16 @@ Note that VAL is not evaluated.
 
 Examples:
   (keu:replace-in-tree '((a 0)
-                      (c @ ())
-                      (e @ (+ 1 2))
-                      (g @))
-                    '(a b c d e f g))
+                         (c @ ())
+                         (e @ (+ 1 2))
+                         (g @))
+                       '(a b c d e f g))
   ; => (0 b d + 1 2 f @)
 
   (keu:replace-in-tree '((a 0)
-                      (c @ ())
-                      (e @ (+ 1 2)))
-                    '(a (a b c d e) c ((a) b (c) d (e)) e))
+                         (c @ ())
+                         (e @ (+ 1 2)))
+                       '(a (a b c d e) c ((a) b (c) d (e)) e))
   ; => (0
   ;     (0 b d + 1 2)
   ;     ((0)
